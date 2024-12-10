@@ -6,139 +6,67 @@
 *       
 */
 
-const chaiHttp = require('chai-http');
-const chai = require('chai');
-const assert = chai.assert;
-const server = require('../server');
+'use strict';
+const { v4: uuidv4 } = require('uuid');
 
-chai.use(chaiHttp);
+let books = {}; // In-memory storage for books
 
-suite('Functional Tests', function() {
-
-  /*
-  * ----[EXAMPLE TEST]----
-  * Each test should completely test the response of the API end-point including response status code!
-  */
-  test('#example Test GET /api/books', function(done){
-     chai.request(server)
-      .get('/api/books')
-      .end(function(err, res){
-        assert.equal(res.status, 200);
-        assert.isArray(res.body, 'response should be an array');
-        assert.property(res.body[0], 'commentcount', 'Books in array should contain commentcount');
-        assert.property(res.body[0], 'title', 'Books in array should contain title');
-        assert.property(res.body[0], '_id', 'Books in array should contain _id');
-        done();
-      });
-  });
-  /*
-  * ----[END of EXAMPLE TEST]----
-  */
-
-  suite('Routing tests', function() {
-
-
-    suite('POST /api/books with title => create book object/expect book object', function() {
-      
-      test('Test POST /api/books with title', function(done) {
-        //done();
-      });
-      
-      test('Test POST /api/books with no title given', function(done) {
-        //done();
-      });
-      
-    });
-
-
-    suite('GET /api/books => array of books', function(){
-      
-      test('Test GET /api/books',  function(done){
-        //done();
-      });      
-      
-    });
-
-
-    suite('GET /api/books/[id] => book object with [id]', function(){
-      
-      test('Test GET /api/books/[id] with id not in db',  function(done){
-        //done();
-      });
-      
-      test('Test GET /api/books/[id] with valid id in db',  function(done){
-        //done();
-      });
-      
-    });
-
-
-    suite('POST /api/books/[id] => add comment/expect book object with id', function(){
-      
-      test('Test POST /api/books/[id] with comment', function(done){
-        //done();
-      });
-
-      test('Test POST /api/books/[id] without comment field', function(done){
-        //done();
-      });
-
-      test('Test POST /api/books/[id] with comment, id not in db', function(done){
-        //done();
-      });
-      
-    });
-
-    suite('DELETE /api/books/[id] => delete book object id', function() {
-
-      test('Test DELETE /api/books/[id] with valid id in db', function(done){
-        //done();
-      });
-
-      test('Test DELETE /api/books/[id] with  id not in db', function(done){
-        //done();
-      });
-
-    });
-
-  });
-
-test('Create an issue with every field', function (done) {
-  chai.request(server)
-    .post('/api/issues/test-project')
-    .send({
-      issue_title: 'Test Issue',
-      issue_text: 'This is a test.',
-      created_by: 'Tester',
-      assigned_to: 'Developer',
-      status_text: 'In progress',
+module.exports = function (app) {
+  // Route to handle all books
+  app.route('/api/books')
+    .get((req, res) => {
+      const allBooks = Object.values(books).map(book => ({
+        _id: book._id,
+        title: book.title,
+        commentcount: book.comments.length,
+      }));
+      res.json(allBooks);
     })
-    .end((err, res) => {
-      assert.equal(res.status, 200);
-      assert.property(res.body, '_id');
-      assert.property(res.body, 'created_on');
-      assert.property(res.body, 'updated_on');
-      assert.property(res.body, 'open');
-      done();
+    .post((req, res) => {
+      const { title } = req.body;
+      if (!title) {
+        return res.status(400).send('missing required field title');
+      }
+      const newBook = {
+        _id: uuidv4(),
+        title,
+        comments: [],
+      };
+      books[newBook._id] = newBook;
+      res.json(newBook);
+    })
+    .delete((req, res) => {
+      books = {};
+      res.send('complete delete successful');
     });
-});
 
-test('View issues on a project', function (done) {
-  chai.request(server)
-    .get('/api/issues/test-project')
-    .end((err, res) => {
-      assert.equal(res.status, 200);
-      assert.isArray(res.body);
-      done();
+  // Route to handle individual books
+  app.route('/api/books/:id')
+    .get((req, res) => {
+      const book = books[req.params.id];
+      if (!book) {
+        return res.status(404).send('no book exists');
+      }
+      res.json(book);
+    })
+    .post((req, res) => {
+      const book = books[req.params.id];
+      const { comment } = req.body;
+      if (!book) {
+        return res.status(404).send('no book exists');
+      }
+      if (!comment) {
+        return res.status(400).send('missing required field comment');
+      }
+      book.comments.push(comment);
+      res.json(book);
+    })
+    .delete((req, res) => {
+      const book = books[req.params.id];
+      if (!book) {
+        return res.status(404).send('no book exists');
+      }
+      delete books[req.params.id];
+      res.send('delete successful');
     });
-});
-
-
-});
-
-
-
-
-
-
-
+};
